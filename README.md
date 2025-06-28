@@ -48,3 +48,34 @@ EasyProxy 旨在实现一个基于 HTTPS 的代理服务器，支持用户名和
 9. 客户端与目标站自行完成第二层 TLS（正常 HTTPS）。
 
 这样既能保护用户名/密码不裸奔，又保持代理“只转发、不解密”的纯隧道角色。
+
+## 证书生成示例
+
+以下示例均可在 Windows 的 `cmd` 中执行，需要预先安装 OpenSSL。请根据客户端连接时填写的"主机标识"（域名或 IP）选择合适的命令。
+
+### 1. 使用域名
+
+```cmd
+openssl req -x509 -newkey rsa:2048 -nodes ^
+  -keyout key.pem -out cert.pem -days 365 ^
+  -subj "/CN=proxy.example.com" ^
+  -addext "subjectAltName=DNS:proxy.example.com"
+```
+
+### 2. 使用 IP 地址
+
+```cmd
+openssl req -x509 -newkey rsa:2048 -nodes ^
+  -keyout key.pem -out cert.pem -days 365 ^
+  -subj "/CN=203.0.113.42" ^
+  -addext "subjectAltName=IP:203.0.113.42"
+```
+
+### 3. 同时支持域名和 IP
+
+```cmd
+openssl req -x509 -newkey rsa:2048 -nodes ^
+  -keyout key.pem -out cert.pem -days 365 ^
+  -subj "/CN=proxy.example.com" ^
+  -addext "subjectAltName=DNS:proxy.example.com,IP:203.0.113.42"
+```
