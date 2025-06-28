@@ -2,6 +2,79 @@ use tokio::{net::TcpStream, io::{AsyncReadExt, AsyncWriteExt}};
 use tokio_rustls::TlsAcceptor;
 use log::{info, error, warn};
 use crate::auth::verify_basic_auth;
+use std::env;
+
+// 获取系统代理设置
+fn get_system_proxy() -> Option<(String, u16)> {
+    // 从环境变量或配置文件读取代理设置
+    let proxy_urls = [
+        env::var("HTTP_PROXY").ok(),
+        env::var("HTTPS_PROXY").ok(),
+        env::var("http_proxy").ok(),
+        env::var("https_proxy").ok(),
+    ];
+    
+    for proxy in proxy_urls {
+        if let Some(proxy_url) = proxy {
+            info!("检测到代理设置: {}", proxy_url);
+            if let Some((host, port)) = parse_proxy_url(&proxy_url) {
+                info!("使用代理: {}:{}", host, port);
+                return Some((host, port));
+            }
+        }
+    }
+    
+    info!("未找到代理设置，将直接连接目标");
+    None
+}
+
+// 解析代理 URL
+fn parse_proxy_url(url: &str) -> Option<(String, u16)> {
+    let url = url.trim();
+    if url.starts_with("http://") {
+        let host_port = &url[7..];
+        if let Some(colon_pos) = host_port.rfind(':') {
+            let host = host_port[..colon_pos].to_string();
+            if let Ok(port) = host_port[colon_pos + 1..].parse::<u16>() {
+                return Some((host, port));
+            }
+        }
+    }
+    None
+}
+
+// 通过代理连接目标
+async fn connect_through_proxy(proxy_host: &str, proxy_port: u16, target: &str) -> Result<TcpStream, Box<dyn std::error::Error + Send + Sync>> {
+    info!("通过代理 {}:{} 连接目标: {}", proxy_host, proxy_port, target);
+    
+    // 连接到代理服务器
+    let mut proxy_stream = TcpStream::connect(format!("{}:{}", proxy_host, proxy_port)).await?;
+    
+    // 发送 CONNECT 请求到代理
+    let connect_request = format!("CONNECT {} HTTP/1.1\r\nHost: {}\r\n\r\n", target, target);
+    proxy_stream.write_all(connect_request.as_bytes()).await?;
+    
+    // 读取代理响应
+    let mut response = Vec::new();
+    let mut buffer = [0u8; 1024];
+    loop {
+        let n = proxy_stream.read(&mut buffer).await?;
+        if n == 0 { break; }
+        response.extend_from_slice(&buffer[..n]);
+        if response.ends_with(b"\r\n\r\n") { break; }
+    }
+    
+    let response_str = String::from_utf8_lossy(&response);
+    info!("代理响应: {}", response_str.lines().next().unwrap_or(""));
+    
+    // 检查响应是否成功
+    if response_str.contains("200") {
+        info!("代理连接成功");
+        Ok(proxy_stream)
+    } else {
+        Err(format!("代理连接失败: {}", response_str).into())
+    }
+}
 
 pub async fn handle_client(
     stream: TcpStream,
@@ -132,17 +205,34 @@ Proxy-Authenticate: Basic realm=\"EasyProxy\"\r\n\r\n",
         return;
     }
     
-    // 连接目标服务器
+    // 连接目标服务器（通过系统代理或直接连接）
     info!("开始连接目标服务器: {}", target);
-    let mut remote = match TcpStream::connect(target).await {
-        Ok(s) => {
-            info!("成功连接到目标服务器: {}", target);
-            s
+    let mut remote = match get_system_proxy() {
+        Some((proxy_host, proxy_port)) => {
+            match connect_through_proxy(&proxy_host, proxy_port, target).await {
+                Ok(stream) => {
+                    info!("通过系统代理成功连接到目标服务器: {}", target);
+                    stream
+                },
+                Err(e) => {
+                    error!("通过系统代理连接失败 {}: {}", target, e);
+                    let _ = stream.write_all(b"HTTP/1.1 502 Bad Gateway\r\n\r\n").await;
+                    return;
+                }
+            }
         },
-        Err(e) => {
-            error!("连接目标服务器失败 {}: {}", target, e);
-            let _ = stream.write_all(b"HTTP/1.1 502 Bad Gateway\r\n\r\n").await;
-            return;
+        None => {
+            match TcpStream::connect(target).await {
+                Ok(s) => {
+                    info!("直接连接成功连接到目标服务器: {}", target);
+                    s
+                },
+                Err(e) => {
+                    error!("直接连接目标服务器失败 {}: {}", target, e);
+                    let _ = stream.write_all(b"HTTP/1.1 502 Bad Gateway\r\n\r\n").await;
+                    return;
+                }
+            }
         }
     };
     
