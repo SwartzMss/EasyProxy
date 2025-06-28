@@ -10,13 +10,15 @@ pub async fn handle_client(
     password: String,
 ) {
     let peer = match stream.peer_addr() { Ok(a) => a, Err(_) => return };
-    info!("Connection from {peer}");
+    info!("连接来自 {peer}");
+    info!("开始与 {peer} 进行 TLS 握手");
     let mut stream = match acceptor.accept(stream).await {
         Ok(s) => s,
-        Err(e) => { error!("TLS error from {peer}: {e}"); return; }
+        Err(e) => { error!("TLS 错误 {e} 来自 {peer}"); return; }
     };
-    info!("TLS established with {peer}");
+    info!("与 {peer} 的 TLS 握手完成");
     // read headers
+    info!("开始读取 {peer} 的请求头");
     let mut buf = Vec::new();
     loop {
         let mut byte = [0u8;1];
@@ -33,6 +35,7 @@ pub async fn handle_client(
     let req = match String::from_utf8(buf) { Ok(s) => s, Err(_) => return };
     let mut lines = req.lines();
     let first = lines.next().unwrap_or("");
+    info!("{peer} 请求行: {first}");
     let mut parts = first.split_whitespace();
     let method = parts.next().unwrap_or("");
     let target = parts.next().unwrap_or("");
@@ -57,7 +60,7 @@ pub async fn handle_client(
         info!("Authentication failed from {peer}");
         return;
     }
-    info!("{peer} authenticated, connecting to {target}");
+    info!("{peer} 认证通过，即将连接到 {target}");
     let mut remote = match TcpStream::connect(target).await {
         Ok(s) => s,
         Err(e) => {
@@ -66,6 +69,7 @@ pub async fn handle_client(
             return;
         }
     };
+    info!("已连接到 {target}");
     if stream
         .write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")
         .await
@@ -73,6 +77,7 @@ pub async fn handle_client(
     {
         return;
     }
+    info!("开始在 {peer} 和 {target} 之间转发数据");
     let _ = tokio::io::copy_bidirectional(&mut stream, &mut remote).await;
     info!("Connection with {peer} closed");
 }
