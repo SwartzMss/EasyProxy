@@ -79,3 +79,26 @@ openssl req -x509 -newkey rsa:2048 -nodes ^
   -subj "/CN=proxy.example.com" ^
   -addext "subjectAltName=DNS:proxy.example.com,IP:203.0.113.42"
 ```
+
+## 环境变量配置
+
+代理的证书路径、监听地址以及认证信息均通过环境变量进行配置。可将这些变量写
+入 `.env` 文件并在运行前加载。以下示例给出了全部变量及默认值：
+
+```dotenv
+# .env.example
+CERT=cert.pem
+KEY=key.pem
+USERNAME=user
+PASSWORD=pass
+ADDRESS=0.0.0.0:8443
+# 日志级别，env_logger 根据该变量控制输出
+RUST_LOG=info
+```
+
+使用方法：
+
+```bash
+cp .env.example .env
+cargo run        # 运行代理，自动加载 .env
+```
