@@ -1,6 +1,6 @@
 use tokio::{net::TcpStream, io::{AsyncReadExt, AsyncWriteExt}};
 use tokio_rustls::TlsAcceptor;
-use log::{info, error, debug, warn};
+use log::{info, error, warn};
 use crate::auth::verify_basic_auth;
 
 pub async fn handle_client(
@@ -13,7 +13,7 @@ pub async fn handle_client(
     info!("新的连接来自: {peer}");
     
     // TLS 握手
-    debug!("开始 TLS 握手...");
+    info!("开始 TLS 握手...");
     let mut stream = match acceptor.accept(stream).await {
         Ok(s) => {
             info!("TLS 握手成功，连接已建立: {peer}");
@@ -26,7 +26,7 @@ pub async fn handle_client(
     };
     
     // 读取 HTTP 请求头
-    debug!("开始读取 HTTP 请求头...");
+    info!("开始读取 HTTP 请求头...");
     let mut buf = Vec::new();
     let mut header_size = 0;
     loop {
@@ -40,7 +40,7 @@ pub async fn handle_client(
                 buf.push(byte[0]);
                 header_size += 1;
                 if buf.ends_with(b"\r\n\r\n") { 
-                    debug!("请求头读取完成，大小: {} 字节", header_size);
+                    info!("请求头读取完成，大小: {} 字节", header_size);
                     break; 
                 }
                 if buf.len() > 8192 { 
@@ -58,7 +58,7 @@ pub async fn handle_client(
     // 解析 HTTP 请求
     let req = match String::from_utf8(buf) { 
         Ok(s) => {
-            debug!("HTTP 请求内容:\n{}", s);
+            info!("HTTP 请求内容:\n{}", s);
             s
         }, 
         Err(e) => {
@@ -69,7 +69,7 @@ pub async fn handle_client(
     
     let mut lines = req.lines();
     let first = lines.next().unwrap_or("");
-    debug!("请求行: {}", first);
+    info!("请求行: {}", first);
     
     let mut parts = first.split_whitespace();
     let method = parts.next().unwrap_or("");
@@ -84,7 +84,7 @@ pub async fn handle_client(
     }
     
     // 认证检查
-    debug!("开始认证检查...");
+    info!("开始认证检查...");
     let mut auth_ok = false;
     let mut auth_header_found = false;
     
@@ -147,7 +147,7 @@ Proxy-Authenticate: Basic realm=\"EasyProxy\"\r\n\r\n",
     };
     
     // 发送连接成功响应
-    debug!("发送 200 Connection Established 响应");
+    info!("发送 200 Connection Established 响应");
     if stream
         .write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")
         .await
