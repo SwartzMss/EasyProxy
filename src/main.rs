@@ -5,6 +5,8 @@ use tokio_rustls::rustls::ServerConfig;
 use tokio_rustls::TlsAcceptor;
 use log::{info, error, warn};
 
+mod logger;
+
 mod cert;
 mod auth;
 mod handler;
@@ -14,14 +16,15 @@ use handler::handle_client;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    logger::init()?;
+    info!("启动 EasyProxy");
     match dotenv() {
         Ok(_) => info!("已加载 .env 文件"),
         Err(e) => {
-            println!("错误: 未找到 .env 文件: {}", e);
+            error!("未找到 .env 文件: {}", e);
             std::process::exit(1);
         },
     }
-    env_logger::init();
 
     let cert = env::var("CERT").unwrap_or_else(|_| {
         warn!("未设置 CERT 环境变量，使用默认值 cert.pem");
@@ -76,6 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let listener = TcpListener::bind(&addr).await?;
     info!("监听地址: https://{addr}");
+    info!("代理已启动，等待连接...");
 
     loop {
         let (stream, _) = listener.accept().await?;
