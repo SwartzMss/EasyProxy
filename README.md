@@ -89,8 +89,8 @@ openssl req -x509 -newkey rsa:2048 -nodes ^
 # .env.example
 CERT=cert.pem
 KEY=key.pem
-USERNAME=user
-PASSWORD=pass
+USER=user
+PASSWD=pass
 ADDRESS=0.0.0.0:8443
 ```
 
