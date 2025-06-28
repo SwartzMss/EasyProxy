@@ -1,6 +1,6 @@
 use tokio::{net::TcpStream, io::{AsyncReadExt, AsyncWriteExt}};
 use tokio_rustls::TlsAcceptor;
-use log::{info, error};
+use log::{info, error, debug, warn};
 use crate::auth::verify_basic_auth;
 
 pub async fn handle_client(
@@ -10,74 +10,149 @@ pub async fn handle_client(
     password: String,
 ) {
     let peer = match stream.peer_addr() { Ok(a) => a, Err(_) => return };
-    info!("连接来自 {peer}");
-    info!("开始与 {peer} 进行 TLS 握手");
+    info!("新的连接来自: {peer}");
+    
+    // TLS 握手
+    debug!("开始 TLS 握手...");
     let mut stream = match acceptor.accept(stream).await {
-        Ok(s) => s,
-        Err(e) => { error!("TLS 错误 {e} 来自 {peer}"); return; }
+        Ok(s) => {
+            info!("TLS 握手成功，连接已建立: {peer}");
+            s
+        },
+        Err(e) => { 
+            error!("TLS 握手失败 {peer}: {e}"); 
+            return; 
+        }
     };
-    info!("与 {peer} 的 TLS 握手完成");
-    // read headers
-    info!("开始读取 {peer} 的请求头");
+    
+    // 读取 HTTP 请求头
+    debug!("开始读取 HTTP 请求头...");
     let mut buf = Vec::new();
+    let mut header_size = 0;
     loop {
         let mut byte = [0u8;1];
         match stream.read(&mut byte).await {
-            Ok(0) => return,
+            Ok(0) => {
+                warn!("客户端 {peer} 在读取请求头时断开连接");
+                return;
+            },
             Ok(_) => {
                 buf.push(byte[0]);
-                if buf.ends_with(b"\r\n\r\n") { break; }
-                if buf.len() > 8192 { error!("header too large from {peer}"); return; }
+                header_size += 1;
+                if buf.ends_with(b"\r\n\r\n") { 
+                    debug!("请求头读取完成，大小: {} 字节", header_size);
+                    break; 
+                }
+                if buf.len() > 8192 { 
+                    error!("请求头过大 {peer}: {} 字节", buf.len()); 
+                    return; 
+                }
             },
-            Err(e) => { error!("read error from {peer}: {e}"); return; }
+            Err(e) => { 
+                error!("读取请求头错误 {peer}: {e}"); 
+                return; 
+            }
         }
     }
-    let req = match String::from_utf8(buf) { Ok(s) => s, Err(_) => return };
+    
+    // 解析 HTTP 请求
+    let req = match String::from_utf8(buf) { 
+        Ok(s) => {
+            debug!("HTTP 请求内容:\n{}", s);
+            s
+        }, 
+        Err(e) => {
+            error!("HTTP 请求解析失败 {peer}: {e}");
+            return; 
+        } 
+    };
+    
     let mut lines = req.lines();
     let first = lines.next().unwrap_or("");
-    info!("{peer} 请求行: {first}");
+    debug!("请求行: {}", first);
+    
     let mut parts = first.split_whitespace();
     let method = parts.next().unwrap_or("");
     let target = parts.next().unwrap_or("");
+    
+    info!("请求方法: {}, 目标: {}", method, target);
+    
     if method != "CONNECT" {
+        warn!("不支持的请求方法 {peer}: {}", method);
         let _ = stream.write_all(b"HTTP/1.1 405 Method Not Allowed\r\n\r\n").await;
         return;
     }
+    
+    // 认证检查
+    debug!("开始认证检查...");
     let mut auth_ok = false;
+    let mut auth_header_found = false;
+    
+    info!("=== 完整的 HTTP 请求头 ===");
     for line in lines {
-        if line.is_empty() { break; }
+        if line.is_empty() { 
+            info!("=== 请求头结束 ===");
+            break; 
+        }
+        info!("请求头: {}", line);
+        
         if line.to_ascii_lowercase().starts_with("proxy-authorization:") {
+            auth_header_found = true;
+            info!("找到认证头: {}", line);
             if let Some(value) = line.splitn(2, ':').nth(1) {
                 let value = value.trim();
+                info!("认证值: {}", value);
                 if verify_basic_auth(value, &username, &password) {
                     auth_ok = true;
+                    info!("认证成功 {peer}");
+                } else {
+                    warn!("认证失败 {peer}: 用户名或密码错误");
                 }
             }
         }
     }
+    
+    if !auth_header_found {
+        warn!("未找到认证头 {peer} - 请求中没有 Proxy-Authorization 字段");
+        info!("请检查 SwitchyOmega 配置是否正确设置了用户名和密码");
+    }
+    
     if !auth_ok {
+        if !auth_header_found {
+            info!("认证失败 {peer}: 缺少认证头");
+        } else {
+            info!("认证失败 {peer}: 用户名或密码错误");
+        }
         let _ = stream.write_all(b"HTTP/1.1 407 Proxy Authentication Required\r\n\r\n").await;
-        info!("Authentication failed from {peer}");
         return;
     }
-    info!("{peer} 认证通过，即将连接到 {target}");
+    
+    // 连接目标服务器
+    info!("开始连接目标服务器: {}", target);
     let mut remote = match TcpStream::connect(target).await {
-        Ok(s) => s,
+        Ok(s) => {
+            info!("成功连接到目标服务器: {}", target);
+            s
+        },
         Err(e) => {
+            error!("连接目标服务器失败 {}: {}", target, e);
             let _ = stream.write_all(b"HTTP/1.1 502 Bad Gateway\r\n\r\n").await;
-            error!("Failed to connect to {target}: {e}");
             return;
         }
     };
-    info!("已连接到 {target}");
+    
+    // 发送连接成功响应
+    debug!("发送 200 Connection Established 响应");
     if stream
         .write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")
         .await
         .is_err()
     {
+        error!("发送连接成功响应失败 {peer}");
         return;
     }
-    info!("开始在 {peer} 和 {target} 之间转发数据");
+    
+    info!("开始双向数据转发 {peer} <-> {}", target);
     let _ = tokio::io::copy_bidirectional(&mut stream, &mut remote).await;
-    info!("Connection with {peer} closed");
+    info!("连接结束 {peer} <-> {}", target);
 }
