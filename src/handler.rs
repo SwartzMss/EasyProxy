@@ -123,7 +123,12 @@ pub async fn handle_client(
         } else {
             info!("认证失败 {peer}: 用户名或密码错误");
         }
-        let _ = stream.write_all(b"HTTP/1.1 407 Proxy Authentication Required\r\n\r\n").await;
+        let _ = stream
+            .write_all(
+                b"HTTP/1.1 407 Proxy Authentication Required\r\n\
+Proxy-Authenticate: Basic realm=\"EasyProxy\"\r\n\r\n",
+            )
+            .await;
         return;
     }
     
