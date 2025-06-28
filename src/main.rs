@@ -34,12 +34,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         warn!("未设置 KEY 环境变量，使用默认值 key.pem");
         "key.pem".into()
     });
-    let user = env::var("USERNAME").unwrap_or_else(|_| {
-        warn!("未设置 USERNAME 环境变量，使用默认值 user");
+    let user = env::var("USER").unwrap_or_else(|_| {
+        warn!("未设置 USER 环境变量，使用默认值 user");
         "user".into()
     });
-    let pass = env::var("PASSWORD").unwrap_or_else(|_| {
-        warn!("未设置 PASSWORD 环境变量，使用默认值 pass");
+    let pass = env::var("PASSWD").unwrap_or_else(|_| {
+        warn!("未设置 PASSWD 环境变量，使用默认值 pass");
         "pass".into()
     });
     let addr = env::var("ADDRESS").unwrap_or_else(|_| {
@@ -49,6 +49,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("加载证书路径: {}", cert);
     info!("加载密钥路径: {}", key);
+    info!("用户名: {}", user);
+    info!("密码: {}", pass);
+    info!("地址: {}", addr);
 
     let certs = match load_certs(&cert) {
         Ok(c) => {
