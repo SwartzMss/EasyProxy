@@ -92,8 +92,6 @@ KEY=key.pem
 USERNAME=user
 PASSWORD=pass
 ADDRESS=0.0.0.0:8443
-# 日志级别，env_logger 根据该变量控制输出
-RUST_LOG=info
 ```
 
 使用方法：

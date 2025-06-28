@@ -1,9 +1,9 @@
 use std::{env, sync::Arc};
 use dotenvy::dotenv;
 use tokio::net::TcpListener;
-use tokio_rustls::rustls::{self, ServerConfig};
+use tokio_rustls::rustls::ServerConfig;
 use tokio_rustls::TlsAcceptor;
-use log::info;
+use log::{info, error, warn};
 
 mod cert;
 mod auth;
@@ -14,23 +14,68 @@ use handler::handle_client;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    dotenv().ok();
+    match dotenv() {
+        Ok(_) => info!("已加载 .env 文件"),
+        Err(e) => {
+            println!("错误: 未找到 .env 文件: {}", e);
+            std::process::exit(1);
+        },
+    }
     env_logger::init();
-    let cert = env::var("CERT").unwrap_or("cert.pem".into());
-    let key = env::var("KEY").unwrap_or("key.pem".into());
-    let user = env::var("USERNAME").unwrap_or("user".into());
-    let pass = env::var("PASSWORD").unwrap_or("pass".into());
-    let addr = env::var("ADDRESS").unwrap_or("0.0.0.0:8443".into());
+
+    let cert = env::var("CERT").unwrap_or_else(|_| {
+        warn!("未设置 CERT 环境变量，使用默认值 cert.pem");
+        "cert.pem".into()
+    });
+    let key = env::var("KEY").unwrap_or_else(|_| {
+        warn!("未设置 KEY 环境变量，使用默认值 key.pem");
+        "key.pem".into()
+    });
+    let user = env::var("USERNAME").unwrap_or_else(|_| {
+        warn!("未设置 USERNAME 环境变量，使用默认值 user");
+        "user".into()
+    });
+    let pass = env::var("PASSWORD").unwrap_or_else(|_| {
+        warn!("未设置 PASSWORD 环境变量，使用默认值 pass");
+        "pass".into()
+    });
+    let addr = env::var("ADDRESS").unwrap_or_else(|_| {
+        warn!("未设置 ADDRESS 环境变量，使用默认值 0.0.0.0:8443");
+        "0.0.0.0:8443".into()
+    });
+
+    info!("加载证书路径: {}", cert);
+    info!("加载密钥路径: {}", key);
+
+    let certs = match load_certs(&cert) {
+        Ok(c) => {
+            info!("证书加载成功，共 {} 条", c.len());
+            c
+        },
+        Err(e) => {
+            error!("加载证书失败: {}", e);
+            return Err(e.into());
+        }
+    };
+    let key = match load_key(&key) {
+        Ok(k) => {
+            info!("密钥加载成功");
+            k
+        },
+        Err(e) => {
+            error!("加载密钥失败: {}", e);
+            return Err(e.into());
+        }
+    };
 
     let mut config = ServerConfig::builder()
-        .with_safe_defaults()
         .with_no_client_auth()
-        .with_single_cert(load_certs(&cert)?, load_key(&key)?)?;
+        .with_single_cert(certs, key)?;
     config.alpn_protocols.push(b"http/1.1".to_vec());
     let acceptor = TlsAcceptor::from(Arc::new(config));
 
     let listener = TcpListener::bind(&addr).await?;
-    info!("Listening on https://{addr}");
+    info!("监听地址: https://{addr}");
 
     loop {
         let (stream, _) = listener.accept().await?;
