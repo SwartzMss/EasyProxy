@@ -3,6 +3,9 @@ use tokio_rustls::TlsAcceptor;
 use log::{info, error, warn};
 use crate::auth::verify_basic_auth;
 use std::env;
+use std::fs::OpenOptions;
+use std::io::Write;
+use chrono::Local;
 
 // 获取系统代理设置
 fn get_system_proxy() -> Option<(String, u16)> {
@@ -41,6 +44,21 @@ fn parse_proxy_url(url: &str) -> Option<(String, u16)> {
         }
     }
     None
+}
+
+fn record_connection(ip: std::net::IpAddr, target: &str) {
+    let now = Local::now().format("%Y-%m-%d %H:%M:%S");
+    match OpenOptions::new().create(true).append(true).open("connections.txt") {
+        Ok(mut file) => {
+            let line = format!("{} {} {}\n", now, ip, target);
+            if let Err(e) = file.write_all(line.as_bytes()) {
+                error!("\u5199\u5165\u8fde\u63a5\u8bb0\u5f55\u5931\u8d25: {}", e);
+            }
+        }
+        Err(e) => {
+            error!("\u65e0\u6cd5\u6253\u5f00\u8fde\u63a5\u8bb0\u5f55\u6587\u4ef6: {}", e);
+        }
+    }
 }
 
 // 通过代理连接目标
@@ -204,6 +222,8 @@ Proxy-Authenticate: Basic realm=\"EasyProxy\"\r\n\r\n",
             .await;
         return;
     }
+
+    record_connection(peer.ip(), target);
     
     // 连接目标服务器（通过系统代理或直接连接）
     info!("开始连接目标服务器: {}", target);
