@@ -52,11 +52,11 @@ fn record_connection(ip: std::net::IpAddr, target: &str) {
         Ok(mut file) => {
             let line = format!("{} {} {}\n", now, ip, target);
             if let Err(e) = file.write_all(line.as_bytes()) {
-                error!("\u5199\u5165\u8fde\u63a5\u8bb0\u5f55\u5931\u8d25: {}", e);
+                error!("写入连接记录失败: {}", e);
             }
         }
         Err(e) => {
-            error!("\u65e0\u6cd5\u6253\u5f00\u8fde\u63a5\u8bb0\u5f55\u6587\u4ef6: {}", e);
+            error!("无法打开连接记录文件: {}", e);
         }
     }
 }
