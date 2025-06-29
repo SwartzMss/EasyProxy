@@ -268,6 +268,19 @@ Proxy-Authenticate: Basic realm=\"EasyProxy\"\r\n\r\n",
     }
     
     info!("开始双向数据转发 {peer} <-> {}", target);
-    let _ = tokio::io::copy_bidirectional(&mut stream, &mut remote).await;
-    info!("连接结束 {peer} <-> {}", target);
+    let result = tokio::io::copy_bidirectional(&mut stream, &mut remote).await;
+    match result {
+        Ok((bytes_from_client, bytes_to_client)) => {
+            info!("连接正常结束 {peer} <-> {}: 客户端→服务器 {} 字节, 服务器→客户端 {} 字节", 
+                  target, bytes_from_client, bytes_to_client);
+        },
+        Err(e) => {
+            let error_msg = e.to_string();
+            if error_msg.contains("close_notify") {
+                warn!("客户端未发送 TLS close_notify {peer} <-> {}: {}", target, error_msg);
+            } else {
+                error!("连接异常结束 {peer} <-> {}: {}", target, e);
+            }
+        }
+    }
 }
