@@ -107,9 +107,7 @@ cargo run        # 运行代理，自动加载 .env
 
 5) 安装到统一路径（供多个进程共享，续期后自动覆盖）
 - `sudo mkdir -p /etc/letsencrypt/live/proxy.your-domain.example`
-- `sudo ~/.acme.sh/acme.sh --install-cert -d proxy.your-domain.example \
-  --key-file       /etc/letsencrypt/live/proxy.your-domain.example/privkey.pem \
-  --fullchain-file /etc/letsencrypt/live/proxy.your-domain.example/fullchain.pem`
+- `sudo ~/.acme.sh/acme.sh --install-cert -d proxy.your-domain.example --key-file /etc/letsencrypt/live/proxy.your-domain.example/privkey.pem --fullchain-file /etc/letsencrypt/live/proxy.your-domain.example/fullchain.pem`
 
 提示：完成服务化后，可在上述命令中追加 `--reloadcmd "<你的重启命令>"`（例如 `systemctl restart easyproxy`），以便续期后自动重载。
 
