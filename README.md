@@ -49,37 +49,6 @@ EasyProxy 旨在实现一个基于 HTTPS 的代理服务器，支持用户名和
 
 这样既能保护用户名/密码不裸奔，又保持代理"只转发、不解密"的纯隧道角色。
 
-## 证书生成示例
-
-以下示例均可在 Windows 的 `cmd` 中执行，需要预先安装 OpenSSL。请根据客户端连接时填写的"主机标识"（域名或 IP）选择合适的命令。
-
-### 1. 使用域名
-
-```cmd
-openssl req -x509 -newkey rsa:2048 -nodes ^
-  -keyout key.pem -out cert.pem -days 365 ^
-  -subj "/CN=proxy.example.com" ^
-  -addext "subjectAltName=DNS:proxy.example.com"
-```
-
-### 2. 使用 IP 地址
-
-```cmd
-openssl req -x509 -newkey rsa:2048 -nodes ^
-  -keyout key.pem -out cert.pem -days 365 ^
-  -subj "/CN=203.0.113.42" ^
-  -addext "subjectAltName=IP:203.0.113.42"
-```
-
-### 3. 同时支持域名和 IP
-
-```cmd
-openssl req -x509 -newkey rsa:2048 -nodes ^
-  -keyout key.pem -out cert.pem -days 365 ^
-  -subj "/CN=proxy.example.com" ^
-  -addext "subjectAltName=DNS:proxy.example.com,IP:203.0.113.42"
-```
-
 ## 环境变量配置
 
 代理的证书路径、监听地址以及认证信息均通过环境变量进行配置。可将这些变量写
@@ -87,8 +56,9 @@ openssl req -x509 -newkey rsa:2048 -nodes ^
 
 ```dotenv
 # .env.example
-CERT=cert.pem
-KEY=key.pem
+# 使用可信 CA 的证书（占位示例，替换为你的真实域名）
+CERT=/etc/letsencrypt/live/proxy.your-domain.example/fullchain.pem
+KEY=/etc/letsencrypt/live/proxy.your-domain.example/privkey.pem
 USER=user
 PASSWD=pass
 ADDRESS=0.0.0.0:8443
@@ -106,3 +76,57 @@ HTTPS_PROXY=http://127.0.0.1:7890
 cp .env.example .env
 cargo run        # 运行代理，自动加载 .env
 ```
+
+## 使用 DNS-01 自动签发（推荐）
+
+当无法开放 80/443 或需要自动化签发/续期时，建议使用 DNS-01 挑战。下面以 DNSPod + acme.sh 为例（域名均为占位示例，已屏蔽）。同一张证书可在同一域名的多个端口/多个进程中复用。
+
+适用场景
+- 不能开放 80/443，但希望自动签发与续期。
+- 多端口/多进程共享同一证书与私钥。
+
+步骤（DNSPod + acme.sh）
+
+1) 安装 acme.sh（非 root 安装，无需停机）
+- `curl https://get.acme.sh | sh`
+- `~/.acme.sh/acme.sh --upgrade --auto-upgrade`
+
+2) 准备 DNSPod API（在 DNSPod 控制台创建 API ID 与 Token）
+- `export DP_Id="YOUR_DNSPOD_ID"`
+- `export DP_Key="YOUR_DNSPOD_TOKEN"`
+
+3) 设定默认 CA 并注册账户（以 Let's Encrypt 为例）
+- `~/.acme.sh/acme.sh --set-default-ca --server letsencrypt`
+- `~/.acme.sh/acme.sh --register-account -m you@example.com --server letsencrypt`
+
+4) 使用 DNS-01 签发证书（域名为占位示例）
+- 单域名：
+  - `~/.acme.sh/acme.sh --issue --dns dns_dp -d proxy.your-domain.example`
+- 泛域名（可同时覆盖根域名）：
+  - `~/.acme.sh/acme.sh --issue --dns dns_dp -d '*.your-domain.example' -d your-domain.example`
+
+5) 安装到统一路径（供多个进程共享，续期后自动覆盖）
+- `sudo mkdir -p /etc/letsencrypt/live/proxy.your-domain.example`
+- `sudo ~/.acme.sh/acme.sh --install-cert -d proxy.your-domain.example \
+  --key-file       /etc/letsencrypt/live/proxy.your-domain.example/privkey.pem \
+  --fullchain-file /etc/letsencrypt/live/proxy.your-domain.example/fullchain.pem \
+  --reloadcmd      "systemctl restart easyproxy.service"`
+
+6) 在 EasyProxy 中使用
+- `.env` 中：
+  - `CERT=/etc/letsencrypt/live/proxy.your-domain.example/fullchain.pem`
+  - `KEY=/etc/letsencrypt/live/proxy.your-domain.example/privkey.pem`
+
+7) 权限与安全
+- 建议让运行用户具备读取私钥的权限（以 Debian/Ubuntu 为例）：
+  - `sudo usermod -aG ssl-cert <your-user>`
+- 或使用 ACL 精细授权：
+  - `sudo setfacl -m u:<your-user>:r /etc/letsencrypt/live/proxy.your-domain.example/privkey.pem`
+
+8) 验证（主机名与证书必须匹配；证书与端口无关）
+- `openssl s_client -connect proxy.your-domain.example:8443 -servername proxy.your-domain.example -showcerts`
+- 同一张证书可用于 `https://proxy.your-domain.example:8443`、`https://proxy.your-domain.example:9443` 等多个端口。
+
+说明
+- 证书绑定“域名”，不绑定端口；同一域名的一张证书可同时用于多个端口与进程。
+- 若你的 DNS 提供商不是 DNSPod，可参考 acme.sh 的其它 DNS 插件，命令形式类似（将 `dns_dp` 换为对应插件）。
