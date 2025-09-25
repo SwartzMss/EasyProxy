@@ -99,29 +99,32 @@ cargo run        # 运行代理，自动加载 .env
 - `~/.acme.sh/acme.sh --set-default-ca --server letsencrypt`
 - `~/.acme.sh/acme.sh --register-account -m you@example.com --server letsencrypt`
 
-4) 使用 DNS-01 签发证书（域名为占位示例）
-- 推荐 EC 证书（体积更小、性能更好）：
+4) 使用 DNS-01 签发证书（统一采用 EC 方案）
+- 单域名：
   - `~/.acme.sh/acme.sh --issue --dns dns_dp -d proxy.your-domain.example --keylength ec-256`
-- 若需泛域名（可同时覆盖根域名）：
+- 泛域名（可同时覆盖根域名）：
   - `~/.acme.sh/acme.sh --issue --dns dns_dp -d '*.your-domain.example' -d your-domain.example --keylength ec-256`
-  - 不使用 `--keylength ec-256` 时默认 RSA，目录不带 `_ecc` 后缀。
 
 5) 安装到固定路径（用户目录，无需 sudo，续期后自动覆盖）
-- EC 证书（路径包含 `_ecc`）：
-  - `~/.acme.sh/acme.sh --install-cert -d proxy.your-domain.example \`
-    `--key-file ~/.acme.sh/proxy.your-domain.example_ecc/proxy.your-domain.example.key \`
-    `--fullchain-file ~/.acme.sh/proxy.your-domain.example_ecc/fullchain.cer`
-- RSA 证书（无 `_ecc` 后缀）：
-  - `~/.acme.sh/acme.sh --install-cert -d proxy.your-domain.example \`
-    `--key-file ~/.acme.sh/proxy.your-domain.example/proxy.your-domain.example.key \`
-    `--fullchain-file ~/.acme.sh/proxy.your-domain.example/fullchain.cer`
+- `~/.acme.sh/acme.sh --install-cert -d proxy.your-domain.example \`
+  `--key-file ~/.acme.sh/proxy.your-domain.example_ecc/proxy.your-domain.example.key \`
+  `--fullchain-file ~/.acme.sh/proxy.your-domain.example_ecc/fullchain.cer`
 
 提示：可追加 `--reloadcmd "<你的重启命令>"` 实现续期后自动重载（例如 `systemctl --user restart easyproxy` 或你的自定义脚本）。
 
 6) 在 EasyProxy 中使用（同一普通用户运行即可）
-- `.env` 中（EC 示例）：
+- `.env` 中：
   - `CERT=/home/<your-user>/.acme.sh/proxy.your-domain.example_ecc/fullchain.cer`
   - `KEY=/home/<your-user>/.acme.sh/proxy.your-domain.example_ecc/proxy.your-domain.example.key`
+
+示例（以 swartzlubel.online 为例）
+- 安装证书：
+  - `~/.acme.sh/acme.sh --install-cert -d swartzlubel.online \`
+    `--key-file ~/.acme.sh/swartzlubel.online_ecc/swartzlubel.online.key \`
+    `--fullchain-file ~/.acme.sh/swartzlubel.online_ecc/fullchain.cer`
+- `.env`：
+  - `CERT=/home/swartz/.acme.sh/swartzlubel.online_ecc/fullchain.cer`
+  - `KEY=/home/swartz/.acme.sh/swartzlubel.online_ecc/swartzlubel.online.key`
 
 7) 权限与安全
 - 全流程使用同一普通用户，无需 sudo/改权限；确保运行 EasyProxy 的用户即为上述证书文件的拥有者。
