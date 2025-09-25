@@ -56,9 +56,9 @@ EasyProxy 旨在实现一个基于 HTTPS 的代理服务器，支持用户名和
 
 ```dotenv
 # .env.example
-# 使用可信 CA 的证书（占位示例，替换为你的真实域名）
-CERT=/etc/letsencrypt/live/proxy.your-domain.example/fullchain.pem
-KEY=/etc/letsencrypt/live/proxy.your-domain.example/privkey.pem
+# 使用 acme.sh (DNS-01) 签发的 EC 证书（安装在用户目录 _ecc 路径）
+CERT=/home/<your-user>/.acme.sh/proxy.your-domain.example_ecc/fullchain.cer
+KEY=/home/<your-user>/.acme.sh/proxy.your-domain.example_ecc/proxy.your-domain.example.key
 USER=user
 PASSWD=pass
 ADDRESS=0.0.0.0:8443
