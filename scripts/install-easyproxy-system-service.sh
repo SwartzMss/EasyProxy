@@ -49,8 +49,45 @@ note "Run user/group: $RUN_USER:$RUN_GROUP"
 
 if [ ! -f "$ENV_FILE" ]; then
   warn ".env not found at $ENV_FILE"
-  warn "The service will still start, but your app currently exits when .env is missing."
-  warn "Create $ENV_FILE or adjust the code to not exit if dotenv is missing."
+  warn "Your app currently exits when .env is missing."
+  # Try to prompt user to create a template .env
+  CREATE_ANS=""
+  if [ -e /dev/tty ]; then
+    printf "Create a template .env now? [y/N]: " > /dev/tty
+    read CREATE_ANS < /dev/tty || CREATE_ANS=""
+  fi
+  case "${CREATE_ANS}" in
+    y|Y)
+      cat > "$ENV_FILE" <<'EOF'
+# Example environment configuration for EasyProxy
+# Fill in your actual certificate and key paths.
+
+# TLS certificate (fullchain) and private key
+CERT=/path/to/fullchain.cer
+KEY=/path/to/privkey.key
+
+# Basic auth credentials
+USER=user
+PASSWD=pass
+
+# Listen address
+ADDRESS=0.0.0.0:8443
+
+# Optional upstream proxy
+#HTTP_PROXY=http://127.0.0.1:7890
+#HTTPS_PROXY=http://127.0.0.1:7890
+
+# Log level
+RUST_LOG=info
+EOF
+      note "Created template: $ENV_FILE (please review/edit before starting)"
+      ;;
+    *)
+      warn "No .env provided. Installation will stop to avoid a failing service."
+      warn "Create $ENV_FILE and rerun this script, or adjust the app to not require .env."
+      exit 1
+      ;;
+  esac
 fi
 
 if [ ! -x "$BIN" ]; then

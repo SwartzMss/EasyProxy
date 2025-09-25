@@ -140,6 +140,8 @@ cargo run        # 运行代理，自动加载 .env
 sh scripts/install-easyproxy-system-service.sh
 ```
 
+提示：安装脚本会检查 `.env` 是否存在；如缺失，会提示是否创建一个模板 `.env`。若拒绝创建将中止安装，以避免安装后服务立即失败。
+
 管理
 
 ```sh
