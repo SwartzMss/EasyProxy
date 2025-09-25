@@ -100,27 +100,31 @@ cargo run        # 运行代理，自动加载 .env
 - `~/.acme.sh/acme.sh --register-account -m you@example.com --server letsencrypt`
 
 4) 使用 DNS-01 签发证书（域名为占位示例）
-- 单域名：
-  - `~/.acme.sh/acme.sh --issue --dns dns_dp -d proxy.your-domain.example`
-- 泛域名（可同时覆盖根域名）：
- - `~/.acme.sh/acme.sh --issue --dns dns_dp -d '*.your-domain.example' -d your-domain.example`
+- 推荐 EC 证书（体积更小、性能更好）：
+  - `~/.acme.sh/acme.sh --issue --dns dns_dp -d proxy.your-domain.example --keylength ec-256`
+- 若需泛域名（可同时覆盖根域名）：
+  - `~/.acme.sh/acme.sh --issue --dns dns_dp -d '*.your-domain.example' -d your-domain.example --keylength ec-256`
+  - 不使用 `--keylength ec-256` 时默认 RSA，目录不带 `_ecc` 后缀。
 
-5) 安装到统一路径（供多个进程共享，续期后自动覆盖）
-- `sudo mkdir -p /etc/letsencrypt/live/proxy.your-domain.example`
-- `sudo ~/.acme.sh/acme.sh --install-cert -d proxy.your-domain.example --key-file /etc/letsencrypt/live/proxy.your-domain.example/privkey.pem --fullchain-file /etc/letsencrypt/live/proxy.your-domain.example/fullchain.pem`
+5) 安装到固定路径（用户目录，无需 sudo，续期后自动覆盖）
+- EC 证书（路径包含 `_ecc`）：
+  - `~/.acme.sh/acme.sh --install-cert -d proxy.your-domain.example \`
+    `--key-file ~/.acme.sh/proxy.your-domain.example_ecc/proxy.your-domain.example.key \`
+    `--fullchain-file ~/.acme.sh/proxy.your-domain.example_ecc/fullchain.cer`
+- RSA 证书（无 `_ecc` 后缀）：
+  - `~/.acme.sh/acme.sh --install-cert -d proxy.your-domain.example \`
+    `--key-file ~/.acme.sh/proxy.your-domain.example/proxy.your-domain.example.key \`
+    `--fullchain-file ~/.acme.sh/proxy.your-domain.example/fullchain.cer`
 
-提示：完成服务化后，可在上述命令中追加 `--reloadcmd "<你的重启命令>"`（例如 `systemctl restart easyproxy`），以便续期后自动重载。
+提示：可追加 `--reloadcmd "<你的重启命令>"` 实现续期后自动重载（例如 `systemctl --user restart easyproxy` 或你的自定义脚本）。
 
-6) 在 EasyProxy 中使用
-- `.env` 中：
-  - `CERT=/etc/letsencrypt/live/proxy.your-domain.example/fullchain.pem`
-  - `KEY=/etc/letsencrypt/live/proxy.your-domain.example/privkey.pem`
+6) 在 EasyProxy 中使用（同一普通用户运行即可）
+- `.env` 中（EC 示例）：
+  - `CERT=/home/<your-user>/.acme.sh/proxy.your-domain.example_ecc/fullchain.cer`
+  - `KEY=/home/<your-user>/.acme.sh/proxy.your-domain.example_ecc/proxy.your-domain.example.key`
 
 7) 权限与安全
-- 建议让运行用户具备读取私钥的权限（以 Debian/Ubuntu 为例）：
-  - `sudo usermod -aG ssl-cert <your-user>`
-- 或使用 ACL 精细授权：
-  - `sudo setfacl -m u:<your-user>:r /etc/letsencrypt/live/proxy.your-domain.example/privkey.pem`
+- 全流程使用同一普通用户，无需 sudo/改权限；确保运行 EasyProxy 的用户即为上述证书文件的拥有者。
 
 8) 验证（主机名与证书必须匹配；证书与端口无关）
 - `openssl s_client -connect proxy.your-domain.example:8443 -servername proxy.your-domain.example -showcerts`
