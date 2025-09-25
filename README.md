@@ -127,3 +127,57 @@ cargo run        # 运行代理，自动加载 .env
 说明
 - 证书绑定“域名”，不绑定端口；同一域名的一张证书可同时用于多个端口与进程。
 - 若你的 DNS 提供商不是 DNSPod，可参考 acme.sh 的其它 DNS 插件，命令形式类似（将 `dns_dp` 换为对应插件）。
+
+## 通过 systemd 部署与日志
+
+使用随仓库提供的脚本快速安装为“系统级”服务（需 sudo）。脚本会：
+- 构建二进制（如未存在 `target/release/easyproxy`）。
+- 写入单元 `/etc/systemd/system/easyproxy.service`，设置 WorkingDirectory 指向仓库目录，`EnvironmentFile` 指向仓库下 `.env`。
+
+安装
+
+```sh
+sh scripts/install-easyproxy-system-service.sh
+```
+
+管理
+
+```sh
+# 查看状态
+sudo systemctl status easyproxy.service
+
+# 重启 / 停止
+sudo systemctl restart easyproxy.service
+sudo systemctl stop easyproxy.service
+```
+
+日志查看
+
+```sh
+# 实时跟随
+sudo journalctl -u easyproxy.service -f
+
+# 查看最近 200 行
+sudo journalctl -u easyproxy.service -n 200
+```
+
+卸载
+
+```sh
+sh scripts/uninstall-easyproxy-system-service.sh
+```
+
+更新代码后
+
+```sh
+# 在仓库内重新编译并重启服务
+cargo build --release
+sudo systemctl restart easyproxy.service
+```
+
+注意
+- `.env` 必须存在且配置正确；当前程序在找不到 `.env` 时会退出。
+- 证书与私钥路径必须对运行该服务的用户可读（脚本默认使用当前用户运行服务，非 root）。
+- 如在 WSL，需先启用 systemd：在 `/etc/wsl.conf` 增加
+  - `[boot]` 与 `systemd=true`，然后在 Windows 执行 `wsl --shutdown` 后重新进入。
+- 监听端口默认为非特权端口 `8443`。若需监听 `<1024` 端口，请另行配置能力（例如 `setcap 'cap_net_bind_service=+ep' <binary>`），不在本文档展开。
