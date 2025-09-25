@@ -106,9 +106,7 @@ cargo run        # 运行代理，自动加载 .env
   - `~/.acme.sh/acme.sh --issue --dns dns_dp -d '*.your-domain.example' -d your-domain.example --keylength ec-256`
 
 5) 安装到固定路径（用户目录，无需 sudo，续期后自动覆盖）
-- `~/.acme.sh/acme.sh --install-cert -d proxy.your-domain.example \`
-  `--key-file ~/.acme.sh/proxy.your-domain.example_ecc/proxy.your-domain.example.key \`
-  `--fullchain-file ~/.acme.sh/proxy.your-domain.example_ecc/fullchain.cer`
+- `~/.acme.sh/acme.sh --install-cert -d proxy.your-domain.example --key-file ~/.acme.sh/proxy.your-domain.example_ecc/proxy.your-domain.example.key --fullchain-file ~/.acme.sh/proxy.your-domain.example_ecc/fullchain.cer`
 
 提示：可追加 `--reloadcmd "<你的重启命令>"` 实现续期后自动重载（例如 `systemctl --user restart easyproxy` 或你的自定义脚本）。
 
@@ -117,14 +115,12 @@ cargo run        # 运行代理，自动加载 .env
   - `CERT=/home/<your-user>/.acme.sh/proxy.your-domain.example_ecc/fullchain.cer`
   - `KEY=/home/<your-user>/.acme.sh/proxy.your-domain.example_ecc/proxy.your-domain.example.key`
 
-示例（以 swartzlubel.online 为例）
-- 安装证书：
-  - `~/.acme.sh/acme.sh --install-cert -d swartzlubel.online \`
-    `--key-file ~/.acme.sh/swartzlubel.online_ecc/swartzlubel.online.key \`
-    `--fullchain-file ~/.acme.sh/swartzlubel.online_ecc/fullchain.cer`
-- `.env`：
-  - `CERT=/home/swartz/.acme.sh/swartzlubel.online_ecc/fullchain.cer`
-  - `KEY=/home/swartz/.acme.sh/swartzlubel.online_ecc/swartzlubel.online.key`
+示例（占位域名）
+- 安装证书（单行命令）：
+  - `~/.acme.sh/acme.sh --install-cert -d proxy.your-domain.example --key-file ~/.acme.sh/proxy.your-domain.example_ecc/proxy.your-domain.example.key --fullchain-file ~/.acme.sh/proxy.your-domain.example_ecc/fullchain.cer`
+- `.env`（占位路径）：
+  - `CERT=/home/<your-user>/.acme.sh/proxy.your-domain.example_ecc/fullchain.cer`
+  - `KEY=/home/<your-user>/.acme.sh/proxy.your-domain.example_ecc/proxy.your-domain.example.key`
 
 7) 权限与安全
 - 全流程使用同一普通用户，无需 sudo/改权限；确保运行 EasyProxy 的用户即为上述证书文件的拥有者。
