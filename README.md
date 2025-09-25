@@ -77,36 +77,6 @@ cp .env.example .env
 cargo run        # 运行代理，自动加载 .env
 ```
 
-## 最简单部署（推荐路径）
-
-目标：证书由 EasyProxy 使用；如需 443 端口，对外用 Nginx 做 TCP 直通，避免在 Nginx 再配置证书。
-
-步骤
-- 签发与安装证书：参见下文“使用 DNS-01 自动签发（推荐）”。安装完成后，确保：
-  - `CERT=/etc/letsencrypt/live/proxy.your-domain.example/fullchain.pem`
-  - `KEY=/etc/letsencrypt/live/proxy.your-domain.example/privkey.pem`
-- 配置 `.env` 并运行 EasyProxy（监听 8443）：
-  - `ADDRESS=0.0.0.0:8443`
-  - `cargo run --release`
-- 可选：用 Nginx 将 443 直通到 8443（Nginx 不需要证书）
-  - 在 `nginx.conf` 或 `conf.d/easyproxy.conf` 添加：
-    - `stream {
-        server {
-          listen 443 reuseport;
-          proxy_pass 127.0.0.1:8443;
-          proxy_timeout 1h;
-          proxy_connect_timeout 10s;
-        }
-      }`
-  - 然后：`sudo nginx -t && sudo systemctl reload nginx`
-
-进阶（可选）
-- 不用 Nginx，直接绑定 443：为二进制授予低端口能力或以 root 启动。
-  - 授权示例：
-    - `sudo setcap 'cap_net_bind_service=+ep' /usr/local/bin/easyproxy`
-    - `.env` 中设置 `ADDRESS=0.0.0.0:443` 后直接运行。
-  - 注意确保仅授予已安装到固定路径的发布版二进制。
-
 ## 使用 DNS-01 自动签发（推荐）
 
 当无法开放 80/443 或需要自动化签发/续期时，建议使用 DNS-01 挑战。下面以 DNSPod + acme.sh 为例（域名均为占位示例，已屏蔽）。同一张证书可在同一域名的多个端口/多个进程中复用。
