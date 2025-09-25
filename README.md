@@ -115,12 +115,7 @@ cargo run        # 运行代理，自动加载 .env
   - `CERT=/home/<your-user>/.acme.sh/proxy.your-domain.example_ecc/fullchain.cer`
   - `KEY=/home/<your-user>/.acme.sh/proxy.your-domain.example_ecc/proxy.your-domain.example.key`
 
-示例（占位域名）
-- 安装证书（单行命令）：
-  - `~/.acme.sh/acme.sh --install-cert -d proxy.your-domain.example --key-file ~/.acme.sh/proxy.your-domain.example_ecc/proxy.your-domain.example.key --fullchain-file ~/.acme.sh/proxy.your-domain.example_ecc/fullchain.cer`
-- `.env`（占位路径）：
-  - `CERT=/home/<your-user>/.acme.sh/proxy.your-domain.example_ecc/fullchain.cer`
-  - `KEY=/home/<your-user>/.acme.sh/proxy.your-domain.example_ecc/proxy.your-domain.example.key`
+
 
 7) 权限与安全
 - 全流程使用同一普通用户，无需 sudo/改权限；确保运行 EasyProxy 的用户即为上述证书文件的拥有者。
